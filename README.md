@@ -1,8 +1,8 @@
 # Integrantes
 
-Alejandro Mejia Florez
-Julian Hoyos Moncada
-Alejandro Arango Munera
+Alejandro Mejia Florez,
+Julian Hoyos Moncada,
+Alejandro Arango Munera.
 
 
 Este proyecto es una aplicación web para la gestión de películas con autenticación de usuarios y roles de administrador. Permite a los usuarios registrarse, iniciar sesión, consultar películas y filtrarlas por año y precio. Los administradores tienen privilegios adicionales para crear nuevas películas.
