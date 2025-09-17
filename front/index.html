@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Películas - Login y Registro</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+    }
+    form {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    input, select, button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .message {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .hidden {
+      display: none;
+    }
+    .movie-container {
+      margin-top: 20px;
+    }
+    .movie-card {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .movie-title {
+      font-weight: bold;
+      font-size: 18px;
+      margin-bottom: 5px;
+    }
+    .movie-info {
+      margin-bottom: 3px;
+    }
+    .filter-form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .filter-form input {
+      flex: 1;
+      margin-bottom: 0;
+    }
+    .filter-form button {
+      width: auto;
+    }
+    .admin-section {
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>App de Películas 🎬</h1>
+  <div id="messages"></div>
+
+  <!-- Registro -->
+  <h2>Registrar Usuario</h2>
+  <form id="registerForm">
+    <input type="text" id="regUser" placeholder="Usuario" required><br>
+    <input type="password" id="regPass" placeholder="Contraseña" required><br>
+    <select id="regRole">
+      <option value="user">Usuario</option>
+      <option value="admin">Administrador</option>
+    </select><br>
+    <button type="submit">Registrar</button>
+  </form>
+
+  <hr>
+
+  <!-- Login -->
+  <h2>Login</h2>
+  <form id="loginForm">
+    <input type="text" id="loginUser" placeholder="Usuario" required><br>
+    <input type="password" id="loginPass" placeholder="Contraseña" required><br>
+    <button type="submit">Entrar</button>
+  </form>
+
+  <p id="token"></p>
+
+  <!-- Sección para mostrar usuarios y hashes (para el profesor) -->
+  <div>
+    <h2>Usuarios Registrados (Demostración para el profesor)</h2>
+    <button id="showUsersBtn">Mostrar Usuarios y Hashes</button>
+    <div id="usersList" style="margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 5px;">
+      <p>Haga clic en el botón para ver los usuarios registrados y sus contraseñas hasheadas.</p>
+    </div>
+  </div>
+
+  <!-- Sección de películas (visible solo después de login) -->
+  <div id="movieSection" class="hidden">
+    <h2>Películas Disponibles</h2>
+    
+    <!-- Filtros -->
+    <div>
+      <h3>Filtrar Películas</h3>
+      <form id="filterForm" class="filter-form">
+        <input type="number" id="filterYear" placeholder="Año mínimo" required>
+        <input type="number" id="filterPrice" placeholder="Precio máximo" required>
+        <button type="submit">Filtrar</button>
+        <button type="button" id="showAllBtn">Ver Todas</button>
+      </form>
+    </div>
+
+    <!-- Lista de películas -->
+    <div id="movieList" class="movie-container"></div>
+
+    <!-- Sección de administrador (visible solo para admins) -->
+    <div id="adminSection" class="admin-section hidden">
+      <h3>Crear Nueva Película (Solo Admin)</h3>
+      <form id="createMovieForm">
+        <input type="text" id="movieTitle" placeholder="Título" required>
+        <input type="text" id="movieDirector" placeholder="Director" required>
+        <input type="number" id="movieYear" placeholder="Año de lanzamiento" required>
+        <input type="text" id="movieProducer" placeholder="Productora" required>
+        <input type="number" id="moviePrice" placeholder="Precio" step="0.01" required>
+        <button type="submit">Crear Película</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let token = "";
+    let userRole = "";
+    const messagesDiv = document.getElementById("messages");
+    const movieSection = document.getElementById("movieSection");
+    const adminSection = document.getElementById("adminSection");
+    const movieList = document.getElementById("movieList");
+
+    // Función para mostrar mensajes
+    function showMessage(message, isError = false) {
+      const messageElement = document.createElement("div");
+      messageElement.className = `message ${isError ? 'error' : 'success'}`;
+      messageElement.textContent = message;
+      messagesDiv.appendChild(messageElement);
+      
+      // Auto-eliminar mensaje después de 5 segundos
+      setTimeout(() => {
+        messageElement.remove();
+      }, 5000);
+    }
+
+    // Función para renderizar películas
+    function renderMovies(movies) {
+      movieList.innerHTML = '';
+      
+      if (movies.length === 0) {
+        movieList.innerHTML = '<p>No se encontraron películas con los criterios seleccionados.</p>';
+        return;
+      }
+      
+      movies.forEach(movie => {
+        const movieCard = document.createElement('div');
+        movieCard.className = 'movie-card';
+        
+        movieCard.innerHTML = `
+          <div class="movie-title">${movie.titulo}</div>
+          <div class="movie-info"><strong>Director:</strong> ${movie.director}</div>
+          <div class="movie-info"><strong>Año:</strong> ${movie.anio}</div>
+          <div class="movie-info"><strong>Productora:</strong> ${movie.productora}</div>
+          <div class="movie-info"><strong>Precio:</strong> $${movie.precio}</div>
+        `;
+        
+        movieList.appendChild(movieCard);
+      });
+    }
+
+    // Función para cargar todas las películas
+    async function loadAllMovies() {
+      try {
+        const res = await fetch("http://localhost:4000/api/movies", {
+          headers: { "Authorization": token }
+        });
+        
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        
+        const movies = await res.json();
+        renderMovies(movies);
+      } catch (error) {
+        console.error("Error al cargar películas:", error);
+        showMessage("Error al cargar películas: " + error.message, true);
+      }
+    }
+
+    // Función para filtrar películas
+    async function filterMovies(year, price) {
+      try {
+        const res = await fetch(`http://localhost:4000/api/movies/filtro?anio=${year}&precio=${price}`, {
+          headers: { "Authorization": token }
+        });
+        
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        
+        const movies = await res.json();
+        renderMovies(movies);
+      } catch (error) {
+        console.error("Error al filtrar películas:", error);
+        showMessage("Error al filtrar películas: " + error.message, true);
+      }
+    }
+
+    // Función para crear película (solo admin)
+    async function createMovie(movieData) {
+      try {
+        const res = await fetch("http://localhost:4000/api/movies", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": token 
+          },
+          body: JSON.stringify(movieData)
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || `Error ${res.status}: ${res.statusText}`);
+        }
+        
+        const movie = await res.json();
+        showMessage(`Película "${movie.titulo}" creada con éxito`);
+        loadAllMovies(); // Recargar la lista de películas
+        return movie;
+      } catch (error) {
+        console.error("Error al crear película:", error);
+        showMessage("Error al crear película: " + error.message, true);
+        return null;
+      }
+    }
+
+    // Función para mostrar la interfaz después del login
+    function showLoggedInUI(role) {
+      userRole = role;
+      movieSection.classList.remove("hidden");
+      
+      // Mostrar sección de admin solo si el usuario es admin
+      if (role === "admin") {
+        adminSection.classList.remove("hidden");
+      } else {
+        adminSection.classList.add("hidden");
+      }
+      
+      // Cargar películas
+      loadAllMovies();
+    }
+
+    // Registro
+    document.getElementById("registerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("regUser").value;
+      const password = document.getElementById("regPass").value;
+      const role = document.getElementById("regRole").value;
+
+      try {
+        console.log("Enviando datos de registro:", { username, role });
+        
+        // Validaciones del lado del cliente
+        if (!username || !password) {
+          showMessage("Usuario y contraseña son requeridos", true);
+          return;
+        }
+        
+        const res = await fetch("http://localhost:4000/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password, role })
+        });
+        
+        console.log("Respuesta del servidor:", res.status, res.statusText);
+        const data = await res.json();
+        console.log("Datos de respuesta:", data);
+        
+        if (res.ok) {
+          showMessage(`Usuario ${username} creado con éxito`);
+          document.getElementById("registerForm").reset();
+        } else {
+          showMessage(data.error || "Error al registrar usuario", true);
+        }
+      } catch (error) {
+        console.error("Error en el registro:", error);
+        showMessage("Error de conexión: " + error.message, true);
+      }
+    });
+
+    // Login
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("loginUser").value;
+      const password = document.getElementById("loginPass").value;
+
+      try {
+        const res = await fetch("http://localhost:4000/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.token) {
+          token = data.token;
+          document.getElementById("token").innerText = "Token: " + token;
+          showMessage(`Bienvenido ${username}!`);
+          document.getElementById("loginForm").reset();
+          
+          // Decodificar el token para obtener el rol (JWT está en formato: header.payload.signature)
+          try {
+            const payload = token.split('.')[1];
+            const decodedPayload = JSON.parse(atob(payload));
+            showLoggedInUI(decodedPayload.role);
+          } catch (e) {
+            console.error("Error al decodificar token:", e);
+            showLoggedInUI("user"); // Por defecto, mostrar como usuario básico
+          }
+        } else {
+          showMessage(data.message || "Error de autenticación", true);
+        }
+      } catch (error) {
+        console.error("Error en el login:", error);
+        showMessage("Error de conexión: " + error.message, true);
+      }
+    });
+
+    // Filtrar películas
+    document.getElementById("filterForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const year = document.getElementById("filterYear").value;
+      const price = document.getElementById("filterPrice").value;
+      
+      if (!year || !price) {
+        showMessage("Por favor ingrese año mínimo y precio máximo", true);
+        return;
+      }
+      
+      await filterMovies(year, price);
+    });
+
+    // Ver todas las películas
+    document.getElementById("showAllBtn").addEventListener("click", () => {
+      document.getElementById("filterForm").reset();
+      loadAllMovies();
+    });
+    
+    // Mostrar usuarios y hashes (para el profesor)
+    document.getElementById("showUsersBtn").addEventListener("click", async () => {
+      try {
+        const res = await fetch("http://localhost:4000/api/auth/users");
+        if (!res.ok) {
+          throw new Error(`Error ${res.status}: ${res.statusText}`);
+        }
+        
+        const users = await res.json();
+        const usersList = document.getElementById("usersList");
+        
+        if (users.length === 0) {
+          usersList.innerHTML = "<p>No hay usuarios registrados todavía.</p>";
+          return;
+        }
+        
+        let html = "<h3>Usuarios Registrados:</h3>";
+        html += "<table style='width: 100%; border-collapse: collapse;'>";
+        html += "<tr style='background-color: #eee;'><th style='text-align: left; padding: 8px; border: 1px solid #ddd;'>Usuario</th><th style='text-align: left; padding: 8px; border: 1px solid #ddd;'>Rol</th><th style='text-align: left; padding: 8px; border: 1px solid #ddd;'>Contraseña Hasheada</th></tr>";
+        
+        users.forEach(user => {
+          html += `<tr>
+            <td style='padding: 8px; border: 1px solid #ddd;'>${user.username}</td>
+            <td style='padding: 8px; border: 1px solid #ddd;'>${user.role}</td>
+            <td style='padding: 8px; border: 1px solid #ddd; word-break: break-all;'>${user.hashedPassword}</td>
+          </tr>`;
+        });
+        
+        html += "</table>";
+        html += "<p style='margin-top: 15px; font-style: italic;'>Nota: Esta tabla muestra cómo las contraseñas se almacenan hasheadas y no en texto plano, lo que es una buena práctica de seguridad.</p>";
+        
+        usersList.innerHTML = html;
+      } catch (error) {
+        console.error("Error al cargar usuarios:", error);
+        document.getElementById("usersList").innerHTML = `<p class="error">Error al cargar usuarios: ${error.message}</p>`;
+      }
+    });
+
+    // Crear película (solo admin)
+    document.getElementById("createMovieForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const movieData = {
+        titulo: document.getElementById("movieTitle").value,
+        director: document.getElementById("movieDirector").value,
+        anio: parseInt(document.getElementById("movieYear").value),
+        productora: document.getElementById("movieProducer").value,
+        precio: parseFloat(document.getElementById("moviePrice").value)
+      };
+      
+      const createdMovie = await createMovie(movieData);
+      if (createdMovie) {
+        document.getElementById("createMovieForm").reset();
+      }
+    });
+  </script>
+</body>
+</html>
